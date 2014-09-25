@@ -1,3 +1,12 @@
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
 import java.io.*;
 import java.util.Scanner;
 
@@ -9,9 +18,30 @@ public class ImageFilter {
       return;
     }
 
-    int[][] image = readImage(args[0]);
-    int[][] filteredImage = filterImage(image);
-    saveImage(filteredImage, args[1]);
+    Configuration configuration = new Configuration();
+    Job job = Job.getInstance(configuration, "ImageFilter");
+    job.setJarByClass(ImageFilter.class);
+    job.setMapperClass(ImageFilterMapper.class);
+    job.setInputFormatClass(ImageInputFormat.class);
+    job.setOutputKeyClass(NullWritable.class);
+    job.setOutputValueClass(Text.class);
+    FileInputFormat.addInputPath(job, new Path(args[0]));
+    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    System.exit(job.waitForCompletion(true) ? 0 : 1);
+  }
+
+  /**
+   * Simple mapper that will apply the filter to the whole input image.
+   */
+  public static class ImageFilterMapper extends Mapper<Object, Text, NullWritable, Text> {
+
+    public void map(Object key, Text value, Context context)
+        throws IOException, InterruptedException {
+      int[][] image = readImage(value.toString());
+      int[][] filteredImage = filterImage(image);
+      saveImage(filteredImage, context);
+    }
+
   }
 
   /**
@@ -81,8 +111,8 @@ public class ImageFilter {
   /**
    * Reads a gray-scale image matrix from file into memory.
    */
-  private static int[][] readImage(String filePath) throws FileNotFoundException {
-    Scanner scanner = new Scanner(new File(filePath));
+  private static int[][] readImage(String imageMatrix) {
+    Scanner scanner = new Scanner(imageMatrix);
 
     int nRows, nCols;
     nRows = scanner.nextInt();
@@ -102,21 +132,19 @@ public class ImageFilter {
   /**
    * Saves a gray-scale image matrix from memory to disk.
    */
-  private static void saveImage(int[][] image, String filePath) throws IOException {
-    BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(filePath));
+  private static void saveImage(int[][] image, Mapper.Context context)
+        throws IOException, InterruptedException {
+    StringBuilder stringBuilder = new StringBuilder();
 
-    bufferedWriter.write(image.length + " " + image[0].length);
-    bufferedWriter.newLine();
-
+    stringBuilder.append(image.length + " " + image[0].length + '\n');
     for (int i = 0; i < image.length; i++) {
       for (int j = 0; j < image[0].length; j++) {
-        bufferedWriter.write((j == 0 ? "" : " ") + Integer.toString(image[i][j]));
+        stringBuilder.append((j == 0 ? "" : " ") + Integer.toString(image[i][j]));
       }
-      bufferedWriter.newLine();
+      stringBuilder.append('\n');
     }
 
-    bufferedWriter.flush();
-    bufferedWriter.close();
+    context.write(NullWritable.get(), new Text(stringBuilder.toString()));
   }
 
 }
