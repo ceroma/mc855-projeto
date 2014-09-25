@@ -4,9 +4,14 @@ import java.util.Scanner;
 public class ImageFilter {
 
   public static void main(String[] args) throws Exception {
-    int[][] image = readImage("Fox_g.txt");
+    if (args.length != 2) {
+      System.err.println("Usage: java ImageFilter input_file output_file");
+      return;
+    }
+
+    int[][] image = readImage(args[0]);
     int[][] filteredImage = filterImage(image);
-    saveImage(filteredImage, "Fox_filtered.txt");
+    saveImage(filteredImage, args[1]);
   }
 
   /**
